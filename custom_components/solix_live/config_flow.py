@@ -13,7 +13,7 @@ def schema(defaults=None):
     defaults = defaults or {}
     result = {}
     for key in FIELDS:
-        label = {"pv_1":"PV-System 1", "pv_2":"PV-System 2", "output_1":"Hausabgabe System 1", "output_2":"Hausabgabe System 2", "soc_1":"Ladestand 1", "soc_2":"Ladestand 2", "status_1":"Betriebszustand 1", "status_2":"Betriebszustand 2", "plugs":"Smart-Plugs"}[key]
+        label = {"pv_1":"PV-System 1", "pv_2":"PV-System 2", "output_1":"Hausabgabe System 1", "output_2":"Hausabgabe System 2", "soc_1":"Ladestand 1", "soc_2":"Ladestand 2", "status_1":"Betriebszustand 1", "status_2":"Betriebszustand 2", "plugs":"Smart-Plugs"}.get(key, key)
         if key not in BASE_FIELDS:
             label = key.replace("_", " ").upper()
         sel = selector.EntitySelector(selector.EntitySelectorConfig(domain="sensor", multiple=(key=="plugs")))
