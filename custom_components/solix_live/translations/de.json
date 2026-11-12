@@ -1,0 +1,39 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "SOLIX Live einrichten",
+        "description": "Wähle die Live-Sensoren deiner zwei Solarbank-Systeme und die Smart-Plug-Leistungssensoren. Die älteren E1600, die in PV-Eingänge einspeisen, nicht zusätzlich als Solarerzeugung zählen.",
+        "data": {
+          "pv_1": "Solarleistung System 1",
+          "pv_2": "Solarleistung System 2",
+          "output_1": "AC-Hausabgabe System 1",
+          "output_2": "AC-Hausabgabe System 2",
+          "soc_1": "Ladestand System 1",
+          "soc_2": "Ladestand System 2",
+          "status_1": "Betriebszustand System 1",
+          "status_2": "Betriebszustand System 2",
+          "plugs": "Smart-Plug-Leistungssensoren"
+        }
+      }
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "title": "Sensorzuordnung bearbeiten",
+        "data": {
+          "pv_1": "Solarleistung System 1",
+          "pv_2": "Solarleistung System 2",
+          "output_1": "AC-Hausabgabe System 1",
+          "output_2": "AC-Hausabgabe System 2",
+          "soc_1": "Ladestand System 1",
+          "soc_2": "Ladestand System 2",
+          "status_1": "Betriebszustand System 1",
+          "status_2": "Betriebszustand System 2",
+          "plugs": "Smart-Plug-Leistungssensoren"
+        }
+      }
+    }
+  }
+}
