@@ -1,0 +1,55 @@
+
+name: SOLIX-Paket entpacken
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  entpacken:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Repository laden
+        uses: actions/checkout@v4
+
+      - name: ZIP sicher entpacken
+        run: |
+          python3 - <<'PY'
+          import zipfile
+          from pathlib import Path
+
+          archive = Path("SOLIX-Live-GitHub-Upload.zip")
+          allowed = {
+              "hacs.json", "LICENSE", "README.md",
+              "custom_components/solix_live/config_flow.py",
+              "custom_components/solix_live/const.py",
+              "custom_components/solix_live/__init__.py",
+              "custom_components/solix_live/strings.json",
+              "custom_components/solix_live/manifest.json",
+              "custom_components/solix_live/sensor.py",
+              "custom_components/solix_live/translations/de.json",
+              "custom_components/solix_live/frontend/solix-live-panel.js",
+          }
+
+          with zipfile.ZipFile(archive) as z:
+              names = set(z.namelist())
+              assert names == allowed, "Unerwarteter ZIP-Inhalt"
+              assert z.testzip() is None, "ZIP beschaedigt"
+              for name in sorted(names):
+                  dest = Path(name)
+                  dest.parent.mkdir(parents=True, exist_ok=True)
+                  dest.write_bytes(z.read(name))
+          print("Alle 11 Dateien erfolgreich entpackt.")
+          PY
+
+      - name: Dateien speichern
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add hacs.json LICENSE README.md custom_components/
+          if ! git diff --cached --quiet; then
+            git commit -m "Install SOLIX Live integration 1.0.0"
+            git push
+          fi
