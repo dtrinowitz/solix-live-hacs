@@ -12,13 +12,14 @@ async def async_setup_entry(hass, entry):
     if not hass.data.get(DOMAIN):
         hass.data[DOMAIN] = True
         await hass.http.async_register_static_paths([
-            StaticPathConfig("/solix_live/solix-live-panel.js", str(Path(__file__).parent / "frontend" / "solix-live-panel.js"), cache_headers=False)
+            StaticPathConfig("/solix_live/solix-live-panel.js", str(Path(__file__).parent / "frontend" / "solix-live-panel.js"), cache_headers=False),
+            StaticPathConfig("/solix_live/solix-live-wrapper.js", str(Path(__file__).parent / "frontend" / "solix-live-wrapper.js"), cache_headers=False)
         ])
         await panel_custom.async_register_panel(
             hass,
             webcomponent_name="solix-live-panel",
             frontend_url_path="solix-live",
-            module_url="/solix_live/solix-live-panel.js",
+            module_url="/solix_live/solix-live-wrapper.js",
             sidebar_title="SOLIX Energie",
             sidebar_icon="mdi:solar-power",
             require_admin=False,
