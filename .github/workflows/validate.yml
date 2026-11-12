@@ -1,0 +1,26 @@
+name: SOLIX Code-Pruefung
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Python und JSON pruefen
+        run: |
+          python3 - <<'PY'
+          import ast, json
+          from pathlib import Path
+          root = Path("custom_components/solix_live")
+          for file in root.glob("*.py"):
+              ast.parse(file.read_text(encoding="utf-8"), filename=str(file))
+          for file in [root/"manifest.json", root/"strings.json", root/"translations/de.json", Path("hacs.json")]:
+              json.loads(file.read_text(encoding="utf-8"))
+          print("Python- und JSON-Syntax OK")
+          PY
+      - name: JavaScript-Syntax pruefen
+        run: node --check custom_components/solix_live/frontend/solix-live-panel.js
