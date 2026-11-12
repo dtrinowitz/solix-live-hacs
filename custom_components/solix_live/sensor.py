@@ -63,7 +63,8 @@ class SolixValue(SensorEntity):
         ids=[key for key in keys if self._config().get(key)]
         if not ids:return None
         values=[self._value(key) for key in ids]
-        return None if any(v is None for v in values) else sum(values)
+        available = [v for v in values if v is not None]
+        return round(sum(available), 1) if available else None
 
     def _plug_readings(self):
         """Read each plug independently; never let one broken plug block the others."""
@@ -95,8 +96,13 @@ class SolixValue(SensorEntity):
     def extra_state_attributes(self):
         if self.key == "systemdetails":
             return self._system_details()
-        if self.key not in ("hausverbrauch", "hauseinspeisung"):
+        if self.key not in ("hausverbrauch", "hauseinspeisung", "solarleistung", "ausgangsleistung"):
             return None
+        if self.key in ("solarleistung", "ausgangsleistung"):
+            keys = ("pv_1", "pv_2") if self.key == "solarleistung" else ("output_1", "output_2")
+            selected = [key for key in keys if self._config().get(key)]
+            missing = [key for key in selected if self._value(key) is None]
+            return {"sources_configured": len(selected), "sources_available": len(selected) - len(missing), "sources_unavailable": missing, "incomplete": bool(missing)}
         _, valid, missing, count = self._plug_readings()
         return {
             "smart_plugs_configured": count,
