@@ -9,6 +9,7 @@ from .const import DOMAIN
 LABELS = {
     "solarleistung": "Solarleistung", "ausgangsleistung": "Ausgangsleistung", "hausverbrauch": "Hausverbrauch",
     "hauseinspeisung": "Hauseinspeisung", "ladestand": "Ladestand", "betriebszustand": "Betriebszustand",
+    "systemdetails": "Systemdetails",
 }
 
 async def async_setup_entry(hass, entry, async_add_entities):
@@ -22,7 +23,7 @@ class SolixValue(SensorEntity):
         self._attr_unique_id = f"solix_live_{key}"
         self._attr_name = LABELS[key]
         self._attr_device_info = DeviceInfo(identifiers={(DOMAIN, "dashboard")}, name="SOLIX Live", manufacturer="SOLIX Live")
-        if key not in ("betriebszustand", "ladestand"):
+        if key not in ("betriebszustand", "ladestand", "systemdetails"):
             self._attr_native_unit_of_measurement = "W"
             self._attr_device_class = SensorDeviceClass.POWER
             self._attr_state_class = SensorStateClass.MEASUREMENT
@@ -39,7 +40,7 @@ class SolixValue(SensorEntity):
         return {**self.entry.data, **self.entry.options}
 
     def _ids(self):
-        d=self._config(); return {x for k,v in d.items() if k in ("pv_1","pv_2","output_1","output_2","soc_1","soc_2","status_1","status_2","plugs") for x in (v if isinstance(v,list) else [v]) if x}
+        d=self._config(); return {x for k,v in d.items() for x in (v if isinstance(v,list) else [v]) if isinstance(x,str) and x}
 
     @callback
     def _update(self, event):
@@ -92,6 +93,8 @@ class SolixValue(SensorEntity):
 
     @property
     def extra_state_attributes(self):
+        if self.key == "systemdetails":
+            return self._system_details()
         if self.key not in ("hausverbrauch", "hauseinspeisung"):
             return None
         _, valid, missing, count = self._plug_readings()
@@ -103,8 +106,68 @@ class SolixValue(SensorEntity):
             "value_quality": "partial" if missing and valid else ("unavailable" if not valid else "complete"),
         }
 
+    def _system_details(self):
+        config = self._config()
+        devices = []
+        for key, label, heated in (
+            ("pro_1", "Solarbank 2 Pro · System 1", True),
+            ("pro_2", "Solarbank 2 Pro · System 2", True),
+            ("e1600_1", "Solarbank E1600 · Akku 1", False),
+            ("e1600_2", "Solarbank E1600 · Akku 2", False),
+        ):
+            readings = {}
+            for metric in ("temp", "soc", "power"):
+                entity_id = config.get(f"{key}_{metric}")
+                state = self.hass.states.get(entity_id) if entity_id else None
+                value = None
+                if state and state.state.lower() not in ("unknown", "unavailable", "none", ""):
+                    try:
+                        value = float(state.state)
+                        if not math.isfinite(value):
+                            value = None
+                    except (TypeError, ValueError):
+                        pass
+                readings[metric] = value
+            devices.append({"name": label, "heated": heated, **readings})
+        mppts = []
+        for system in (1, 2):
+            for index in range(1, 5):
+                entity_id = config.get(f"pro_{system}_mppt_{index}")
+                state = self.hass.states.get(entity_id) if entity_id else None
+                value = None
+                if state and state.state.lower() not in ("unknown", "unavailable", "none", ""):
+                    try:
+                        value = float(state.state)
+                        if state.attributes.get("unit_of_measurement") == "kW":
+                            value *= 1000
+                        if not math.isfinite(value):
+                            value = None
+                    except (TypeError, ValueError):
+                        pass
+                mppts.append({"system": system, "index": index, "power": value})
+        plugs = config.get("plugs", []) or []
+        if isinstance(plugs, str):
+            plugs = [plugs]
+        plug_values = []
+        for entity_id in plugs:
+            state = self.hass.states.get(entity_id)
+            value = None
+            if state and state.state.lower() not in ("unknown", "unavailable", "none", ""):
+                try:
+                    value = float(state.state)
+                    if state.attributes.get("unit_of_measurement") == "kW":
+                        value *= 1000
+                    if not math.isfinite(value):
+                        value = None
+                except (TypeError, ValueError):
+                    pass
+            plug_values.append({"name": state.attributes.get("friendly_name", entity_id) if state else entity_id, "power": value})
+        return {"devices": devices, "mppts": mppts, "plugs": plug_values}
+
     @property
     def native_value(self):
+        if self.key == "systemdetails":
+            return "Bereit"
         if self.key == "solarleistung":
             return self._sum(["pv_1", "pv_2"])
         if self.key == "ausgangsleistung":
