@@ -1,0 +1,28 @@
+name: SOLIX Live Release veröffentlichen
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'custom_components/solix_live/manifest.json'
+      - '.github/workflows/publish-release.yml'
+  workflow_dispatch:
+permissions:
+  contents: write
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Version prüfen und GitHub-Release anlegen
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          VERSION=$(python3 -c 'import json; print(json.load(open("custom_components/solix_live/manifest.json"))["version"])')
+          TAG="v${VERSION}"
+          echo "Publishing ${TAG}"
+          if gh release view "${TAG}" >/dev/null 2>&1; then
+            echo "Release ${TAG} exists; no duplicate."
+          else
+            gh release create "${TAG}" --target "${GITHUB_SHA}" --title "SOLIX Live ${VERSION}" --notes "Home Assistant SOLIX Live Energiedashboard ${VERSION}. Installation über HACS/Marketplace. Nach Installation Home Assistant neu starten."
+          fi
