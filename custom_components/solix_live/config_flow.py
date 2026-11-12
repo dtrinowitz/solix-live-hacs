@@ -4,13 +4,18 @@ from homeassistant import config_entries
 from homeassistant.helpers import selector
 from .const import DOMAIN
 
-FIELDS = ("pv_1", "pv_2", "output_1", "output_2", "soc_1", "soc_2", "status_1", "status_2", "plugs")
+BASE_FIELDS = ("pv_1", "pv_2", "output_1", "output_2", "soc_1", "soc_2", "status_1", "status_2", "plugs")
+DETAIL_FIELDS = tuple(f"{device}_{metric}" for device in ("pro_1", "pro_2", "e1600_1", "e1600_2") for metric in ("temp", "soc", "power"))
+MPPT_FIELDS = tuple(f"pro_{i}_mppt_{j}" for i in (1, 2) for j in range(1, 5))
+FIELDS = BASE_FIELDS + DETAIL_FIELDS + MPPT_FIELDS
 
 def schema(defaults=None):
     defaults = defaults or {}
     result = {}
     for key in FIELDS:
         label = {"pv_1":"PV-System 1", "pv_2":"PV-System 2", "output_1":"Hausabgabe System 1", "output_2":"Hausabgabe System 2", "soc_1":"Ladestand 1", "soc_2":"Ladestand 2", "status_1":"Betriebszustand 1", "status_2":"Betriebszustand 2", "plugs":"Smart-Plugs"}[key]
+        if key not in BASE_FIELDS:
+            label = key.replace("_", " ").upper()
         sel = selector.EntitySelector(selector.EntitySelectorConfig(domain="sensor", multiple=(key=="plugs")))
         result[vol.Optional(key, default=defaults[key]) if key in defaults else vol.Optional(key)] = sel
     return vol.Schema(result)
