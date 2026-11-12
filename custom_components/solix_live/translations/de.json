@@ -13,7 +13,27 @@
           "soc_2": "Ladestand System 2",
           "status_1": "Betriebszustand System 1",
           "status_2": "Betriebszustand System 2",
-          "plugs": "Smart-Plug-Leistungssensoren"
+          "plugs": "Smart-Plug-Leistungssensoren",
+          "pro_1_temp": "Solarbank 2 Pro · System 1 · Akkutemperatur",
+          "pro_1_soc": "Solarbank 2 Pro · System 1 · Ladestand",
+          "pro_1_power": "Solarbank 2 Pro · System 1 · Lade-/Entladeleistung",
+          "pro_2_temp": "Solarbank 2 Pro · System 2 · Akkutemperatur",
+          "pro_2_soc": "Solarbank 2 Pro · System 2 · Ladestand",
+          "pro_2_power": "Solarbank 2 Pro · System 2 · Lade-/Entladeleistung",
+          "e1600_1_temp": "Solarbank E1600 · Akku 1 · Akkutemperatur",
+          "e1600_1_soc": "Solarbank E1600 · Akku 1 · Ladestand",
+          "e1600_1_power": "Solarbank E1600 · Akku 1 · Lade-/Entladeleistung",
+          "e1600_2_temp": "Solarbank E1600 · Akku 2 · Akkutemperatur",
+          "e1600_2_soc": "Solarbank E1600 · Akku 2 · Ladestand",
+          "e1600_2_power": "Solarbank E1600 · Akku 2 · Lade-/Entladeleistung",
+          "pro_1_mppt_1": "Solarbank 2 Pro · System 1 · MPPT 1 (W)",
+          "pro_1_mppt_2": "Solarbank 2 Pro · System 1 · MPPT 2 (W)",
+          "pro_1_mppt_3": "Solarbank 2 Pro · System 1 · MPPT 3 (W)",
+          "pro_1_mppt_4": "Solarbank 2 Pro · System 1 · MPPT 4 (W)",
+          "pro_2_mppt_1": "Solarbank 2 Pro · System 2 · MPPT 1 (W)",
+          "pro_2_mppt_2": "Solarbank 2 Pro · System 2 · MPPT 2 (W)",
+          "pro_2_mppt_3": "Solarbank 2 Pro · System 2 · MPPT 3 (W)",
+          "pro_2_mppt_4": "Solarbank 2 Pro · System 2 · MPPT 4 (W)"
         }
       }
     }
@@ -31,7 +51,27 @@
           "soc_2": "Ladestand System 2",
           "status_1": "Betriebszustand System 1",
           "status_2": "Betriebszustand System 2",
-          "plugs": "Smart-Plug-Leistungssensoren"
+          "plugs": "Smart-Plug-Leistungssensoren",
+          "pro_1_temp": "Solarbank 2 Pro · System 1 · Akkutemperatur",
+          "pro_1_soc": "Solarbank 2 Pro · System 1 · Ladestand",
+          "pro_1_power": "Solarbank 2 Pro · System 1 · Lade-/Entladeleistung",
+          "pro_2_temp": "Solarbank 2 Pro · System 2 · Akkutemperatur",
+          "pro_2_soc": "Solarbank 2 Pro · System 2 · Ladestand",
+          "pro_2_power": "Solarbank 2 Pro · System 2 · Lade-/Entladeleistung",
+          "e1600_1_temp": "Solarbank E1600 · Akku 1 · Akkutemperatur",
+          "e1600_1_soc": "Solarbank E1600 · Akku 1 · Ladestand",
+          "e1600_1_power": "Solarbank E1600 · Akku 1 · Lade-/Entladeleistung",
+          "e1600_2_temp": "Solarbank E1600 · Akku 2 · Akkutemperatur",
+          "e1600_2_soc": "Solarbank E1600 · Akku 2 · Ladestand",
+          "e1600_2_power": "Solarbank E1600 · Akku 2 · Lade-/Entladeleistung",
+          "pro_1_mppt_1": "Solarbank 2 Pro · System 1 · MPPT 1 (W)",
+          "pro_1_mppt_2": "Solarbank 2 Pro · System 1 · MPPT 2 (W)",
+          "pro_1_mppt_3": "Solarbank 2 Pro · System 1 · MPPT 3 (W)",
+          "pro_1_mppt_4": "Solarbank 2 Pro · System 1 · MPPT 4 (W)",
+          "pro_2_mppt_1": "Solarbank 2 Pro · System 2 · MPPT 1 (W)",
+          "pro_2_mppt_2": "Solarbank 2 Pro · System 2 · MPPT 2 (W)",
+          "pro_2_mppt_3": "Solarbank 2 Pro · System 2 · MPPT 3 (W)",
+          "pro_2_mppt_4": "Solarbank 2 Pro · System 2 · MPPT 4 (W)"
         }
       }
     }
