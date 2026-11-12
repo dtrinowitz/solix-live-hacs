@@ -1,6 +1,7 @@
 """Live, read-only aggregated SOLIX sensors."""
 from homeassistant.components.sensor import SensorEntity, SensorDeviceClass, SensorStateClass
 from homeassistant.core import callback
+import math
 from homeassistant.helpers.event import async_track_state_change_event
 from homeassistant.helpers.entity import DeviceInfo
 from .const import DOMAIN
@@ -54,7 +55,7 @@ class SolixValue(SensorEntity):
             value=float(state.state)
             unit=state.attributes.get("unit_of_measurement", "")
             if unit == "kW":value *= 1000
-            return max(0.0,value)
+            return max(0.0,value) if math.isfinite(value) else None
         except (TypeError,ValueError):return None
 
     def _sum(self, keys):
@@ -63,28 +64,58 @@ class SolixValue(SensorEntity):
         values=[self._value(key) for key in ids]
         return None if any(v is None for v in values) else sum(values)
 
+    def _plug_readings(self):
+        """Read each plug independently; never let one broken plug block the others."""
+        plugs = self._config().get("plugs", []) or []
+        if isinstance(plugs, str):
+            plugs = [plugs]
+        total = 0.0
+        valid, missing = [], []
+        for plug in plugs:
+            state = self.hass.states.get(plug)
+            try:
+                if state is None or state.state.lower() in ("unknown", "unavailable", "none", ""):
+                    raise ValueError("not available")
+                value = float(state.state)
+                if not math.isfinite(value):
+                    raise ValueError("not finite")
+                unit = state.attributes.get("unit_of_measurement", "W")
+                if unit == "kW":
+                    value *= 1000
+                elif unit != "W":
+                    raise ValueError("not a power sensor")
+                total += max(0.0, value)
+                valid.append(plug)
+            except (ValueError, TypeError, AttributeError):
+                missing.append(plug)
+        return round(total, 1) if valid else None, valid, missing, len(plugs)
+
+    @property
+    def extra_state_attributes(self):
+        if self.key not in ("hausverbrauch", "hauseinspeisung"):
+            return None
+        _, valid, missing, count = self._plug_readings()
+        return {
+            "smart_plugs_configured": count,
+            "smart_plugs_available": len(valid),
+            "smart_plugs_unavailable": missing,
+            "incomplete": bool(missing),
+            "value_quality": "partial" if missing and valid else ("unavailable" if not valid else "complete"),
+        }
+
     @property
     def native_value(self):
-        if self.key == "solarleistung":return self._sum(["pv_1", "pv_2"])
-        if self.key == "ausgangsleistung":return self._sum(["output_1", "output_2"])
+        if self.key == "solarleistung":
+            return self._sum(["pv_1", "pv_2"])
+        if self.key == "ausgangsleistung":
+            return self._sum(["output_1", "output_2"])
         if self.key == "hausverbrauch":
-            plugs=self._config().get("plugs", [])
-            if not plugs:return None
-            values=[]
-            for plug in plugs:
-                state=self.hass.states.get(plug)
-                if state is None or state.state in ("unknown","unavailable"):
-                    return None
-                try:
-                    v=float(state.state)
-                    if state.attributes.get("unit_of_measurement")=="kW":v*=1000
-                    values.append(max(0,v))
-                except (TypeError,ValueError):return None
-            return round(sum(values),1)
+            total, _, _, _ = self._plug_readings()
+            return total
         if self.key == "hauseinspeisung":
-            output=self._sum(["output_1","output_2"])
-            plugs=self._plugs_total()
-            return None if output is None or plugs is None else max(0,round(output-plugs,1))
+            output = self._sum(["output_1", "output_2"])
+            plugs, _, _, _ = self._plug_readings()
+            return None if output is None or plugs is None else max(0, round(output - plugs, 1))
         if self.key == "ladestand":
             values=[self._value(k) for k in ("soc_1","soc_2") if self._config().get(k)]
             return None if not values or any(v is None for v in values) else round(sum(values)/len(values),1)
@@ -97,16 +128,3 @@ class SolixValue(SensorEntity):
                     if state and state.state not in ("unknown","unavailable"):vals.append(state.state)
             return " / ".join(vals) if vals else None
 
-    def _plugs_total(self):
-        plugs=self._config().get("plugs",[])
-        if not plugs:return None
-        total=0
-        for plug in plugs:
-            state=self.hass.states.get(plug)
-            if not state:return None
-            try:
-                n=float(state.state)
-                if state.attributes.get("unit_of_measurement")=="kW":n*=1000
-                total+=max(0,n)
-            except (TypeError,ValueError):return None
-        return total
