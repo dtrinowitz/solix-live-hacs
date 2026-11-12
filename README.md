@@ -1,31 +1,37 @@
-# SOLIX Live Energiedashboard 1.0.0
+# SOLIX Live Energiedashboard (Version 1.0.0)
 
-Home-Assistant-Custom-Integration mit eigenem Sidebar-Panel, originalem freigegebenem V4.3-Hausmotiv und kontinuierlichen Lichtpunktanimationen. **Keine Demo- oder Zufallswerte.**
+Benutzerdefinierte Home-Assistant-Integration mit eigenem Sidebar-Panel und der freigegebenen V4.3-Hausansicht. Das Frontend enthält die Hausgrafik und animierte Lichtpunkte; Leistungswerte werden aus konfigurierten Home-Assistant-Sensoren gelesen, nicht simuliert.
 
-## HACS-Installation
+## Installation über den Marketplace (Home Assistant 2026.11)
 
-1. In HACS das öffentliche Repository `https://github.com/dtrinowitz/solix-live-hacs` als benutzerdefiniertes Repository hinzufügen (Kategorie **Integration**).
-2. Die Integration **SOLIX Live Energiedashboard** in HACS herunterladen.
-3. Home Assistant neu starten. Einstellungen → Geräte & Dienste → Integration hinzufügen → **SOLIX Live Energiedashboard**.
-4. Live-Sensoren in der Oberfläche auswählen. Danach erscheint **SOLIX Energie** links in der Seitenleiste. Keine manuelle JavaScript-Ressource oder YAML notwendig.
+1. Home Assistant öffnen → **Marketplace**.
+2. Falls noch nicht geschehen: **Benutzerdefinierte Repositorys** → **Über Link hinzufügen** → `https://github.com/dtrinowitz/solix-live-hacs` → Typ **Integration**.
+3. Im Marketplace nach **SOLIX Live Energiedashboard** suchen und **Installieren** auswählen.
+4. **Home Assistant neu starten**.
+5. **Einstellungen → Geräte & Dienste → Integration hinzufügen** → **SOLIX Live Energiedashboard**.
+6. Die tatsächlichen PV-, Ausgangsleistungs-, Ladezustands- und Smart-Plug-Entitäten beider Anlagen auswählen. Danach sollte **SOLIX Energie** in der Seitenleiste erscheinen.
 
-## Vorgeschlagene Entity-IDs (vor Ort in Home Assistant prüfen)
+Für ältere Home-Assistant-Versionen mit HACS ist der benutzerdefinierte Repository-Weg weiterhin möglich. Diese Anleitung beschreibt vorrangig den Marketplace, den Home Assistant 2026.11 auf der Zielinstallation anzeigt.
 
-| Funktion | System 1 | System 2 |
-|---|---|---|
-| PV | `sensor.solarbank_2_e1600_pro_solarleistung` | `sensor.solarbank_2_e1600_pro_solarleistung_2` |
-| Ausgang | `sensor.solarbank_2_e1600_pro_ac_hausabgabe` | `sensor.solarbank_2_e1600_pro_ac_hausabgabe_2` |
-| SoC | `sensor.solarbank_2_e1600_pro_ladestand` | `sensor.solarbank_2_e1600_pro_ladestand_2` |
-| Status | `sensor.solarbank_2_e1600_pro_betriebszustand` | `sensor.solarbank_2_e1600_pro_betriebszustand_2` |
+## Daten und Berechnungen
 
-Bekannter Smart Plug: `sensor.smart_plug_leistung`. Weitere Smart-Plug-Sensoren in der Mehrfachauswahl hinzufügen. Die zwei Pro-Geräte müssen in Home Assistant als tatsächlich unterschiedliche Anlagen bestätigt werden; `_2` allein ist kein sicherer Beweis.
+- **Solarleistung** = PV-System 1 + PV-System 2.
+- **Ausgangsleistung** = Hausabgabe System 1 + Hausabgabe System 2.
+- **Hausverbrauch** = Summe der ausgewählten Smart-Plug-Leistungssensoren.
+- **Hauseinspeisung** = max(0, Ausgangsleistung − Hausverbrauch).
+- **Ladestand** = ungewichteter Mittelwert der gewählten SoC-Sensoren.
+- Nicht verfügbare Leistungswerte werden nicht durch Demo-Werte ersetzt. Gemessene PV-Werte werden auch nachts nicht künstlich auf null gesetzt.
 
-**Berechnung:** PV = Summe beider Pro-PV-Sensoren; Ausgang = Summe beider AC-Hausabgaben; Hausverbrauch = Summe der gewählten Smart-Plug-Leistungen; Hauseinspeisung = max(0, Ausgang − Hausverbrauch). Nicht verfügbare Werte bleiben unbekannt (keine simulierten Nullwerte). Ladezustand = einfacher Mittelwert der zwei gewählten SoC-Sensoren, nicht kapazitätsgewichtet.
+Die Hauseinspeisung ist eine **berechnete Restleistung**, keine Messung eines Netz-Zweirichtungszählers. Die Integration steuert keine Anker-Geräte.
 
-**Wichtig:** Diese erste Integration enthält noch keine automatische, zweifelsfreie Zuordnung der Anlagen und Smart Plugs. Die Auswahl geschieht über Home Assistant ohne Codeeingriff. Die ursprüngliche V4.3-Grafik ist enthalten. Kein Live-Test auf deiner HA-Installation durchgeführt.
+## Hinweise zur Konfiguration
 
-## Veröffentlichungsstand
+Die vorgeschlagenen Entity-IDs im Einrichtungsdialog sind lediglich Beispiele. Prüfe vor dem Speichern, dass die beiden Anlagen tatsächlich unterschiedlichen Entitäten zugeordnet sind und die Smart-Plug-Auswahl nur **aktuelle Leistungssensoren (W/kW)** enthält, keine kumulierten Energiesensoren (Wh/kWh). Automatische, zweifelsfreie Erkennung ist noch nicht implementiert.
 
-Repository: https://github.com/dtrinowitz/solix-live-hacs
+Die grafische Ansicht ist in `custom_components/solix_live/frontend/solix-live-panel.js` eingebettet; keine separate Bilddatei oder manuelle Lovelace-JavaScript-Ressource erforderlich.
 
-Quellcode ist veröffentlicht; die Installation und Sensorwerte wurden noch nicht in einer echten Home-Assistant-Instanz geprüft. Das große Frontend-Motiv bleibt unverändert.
+## Stand und Einschränkungen
+
+Die Dateien sind im GitHub-Repository vorhanden. Ein erfolgreicher Marketplace-Eintrag bestätigt die Erkennung des Repositorys, **nicht** die Laufzeitfunktion. Ein vollständiger Live-Test auf der Zielinstallation steht noch aus. Vor dem produktiven Einsatz sind Einrichtung, Sidebar-Anzeige, Sensorberechnung und Animation zu prüfen.
+
+Projekt: https://github.com/dtrinowitz/solix-live-hacs
