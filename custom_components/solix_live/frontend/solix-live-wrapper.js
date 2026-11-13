@@ -20,6 +20,40 @@ Panel.prototype._metricEntity=function(key){
   });
   return matches.length===1?matches[0]:null;
 };
+Panel.prototype.openDetails=function(kind){
+  const key={pv:'solarleistung',battery:'ladestand',home:'hausverbrauch',export:'hauseinspeisung'}[kind];
+  const target=key&&this._metricEntity(key);
+  if(!target)return;
+  this.dispatchEvent(new CustomEvent('hass-more-info',{bubbles:true,composed:true,detail:{entityId:target.entity_id}}));
+};
+Panel.prototype._translateStatus=function(value){
+ const labels={discharge:'Entladen',charge:'Laden',charging:'Laden',discharging:'Entladen',detection:'Erkennung',standby:'Bereitschaft',full_bypass:'Direktversorgung',bypass:'Direktversorgung',idle:'Leerlauf'};
+ return String(value||'Unbekannt').split(/(\\s*\\/\\s*)/).map(part=>labels[part.trim().toLowerCase()]||part).join('');
+};
+Panel.prototype._updateVisualLabels=function(){
+ const view=this.$('view');if(!view)return;
+ const svgNS='http://www.w3.org/2000/svg';
+ let badge=view.querySelector('#solix-title-badge');
+ if(!badge){
+  const candidates=[...view.querySelectorAll('text')];
+  const heading=candidates.find(el=>el.textContent?.trim()==='SOLIX Energy Center');
+  if(heading){
+   const group=heading.parentElement;
+   if(group){
+    group.id='solix-title-badge';
+    const subtitle=[...group.querySelectorAll('text')].find(el=>el!==heading);
+    subtitle?.remove();
+    const rect=group.querySelector('rect');
+    if(rect){rect.setAttribute('x','1128');rect.setAttribute('y','25');rect.setAttribute('width','492');rect.setAttribute('height','83');}
+    heading.setAttribute('x','1152');heading.setAttribute('y','78');heading.setAttribute('font-size','37');
+   }
+  }
+ }
+ const card=this.$('batteryCard');
+ const rect=card?.querySelector('rect');if(rect){rect.setAttribute('width','490');rect.setAttribute('x','560');rect.setAttribute('height','100');rect.setAttribute('y','753');}
+ const lines=card?.querySelectorAll('text');
+ if(lines?.length>=2){lines[0].setAttribute('x','580');lines[0].setAttribute('y','789');lines[0].setAttribute('font-size','29');lines[1].setAttribute('x','580');lines[1].setAttribute('y','828');lines[1].setAttribute('font-size','28');}
+};
 Panel.prototype._installMetricDetailRouting=function(){
   if(this._metricDetailRoutingInstalled)return;
   this._metricDetailRoutingInstalled=true;
@@ -44,6 +78,6 @@ bar.querySelector('#solix-entities-toggle').addEventListener('click',()=>{sectio
 section.querySelector('#solix-search').addEventListener('input',()=>this.renderEntityCatalog());section.querySelector('#solix-only').addEventListener('change',()=>this.renderEntityCatalog());this.refresh();};
 Panel.prototype._solixEntity=function(id){const states=this._hass?.states||{};if(states[id])return states[id];const suffix=id.replace(/^sensor\.solix_live_/, '').replace(/_/g,' ');const candidates=Object.values(states).filter(s=>s.entity_id?.startsWith('sensor.')&&s.entity_id.includes('solix_live')&&(s.entity_id.endsWith('_'+suffix.replace(/ /g,'_'))||String(s.attributes?.friendly_name||'').toLowerCase().endsWith(suffix)));return candidates.length===1?candidates[0]:null;};
 Panel.prototype._num=function(id){const state=this._solixEntity(id);if(!state||['unknown','unavailable','none',''].includes(String(state.state).toLowerCase()))return null;const n=Number(state.state);return Number.isFinite(n)?n:null;};
-Panel.prototype.refresh=function(){if(!this._ready||!this._hass)return;originalRefresh.call(this);const pre='sensor.solix_live_';const state=this._solixEntity(pre+'betriebszustand')?.state||'Unbekannt';const card=this.$('batteryCard');const t=card?.querySelectorAll('text');if(t?.length)t[0].textContent='⚡ '+state;const details=this._solixEntity(pre+'systemdetails');if(details?.attributes){this._solixDetails=details.attributes;this.renderDetails();}if(this.shadowRoot.getElementById('solix-entity-section')?.hidden===false)this.renderEntityCatalog();};
+Panel.prototype.refresh=function(){if(!this._ready||!this._hass)return;originalRefresh.call(this);const pre='sensor.solix_live_';const state=this._solixEntity(pre+'betriebszustand')?.state||'Unbekannt';const card=this.$('batteryCard');const t=card?.querySelectorAll('text');if(t?.length)t[0].textContent='⚡ '+this._translateStatus(state);this._updateVisualLabels();const details=this._solixEntity(pre+'systemdetails');if(details?.attributes){this._solixDetails=details.attributes;this.renderDetails();}if(this.shadowRoot.getElementById('solix-entity-section')?.hidden===false)this.renderEntityCatalog();};
 Panel.prototype.renderDetails=function(){const attrs=this._solixEntity('sensor.solix_live_systemdetails')?.attributes||{};const esc=v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));const fmt=(v,u)=>v==null||!Number.isFinite(Number(v))?'Nicht verfügbar':Number(v).toLocaleString('de-DE',{maximumFractionDigits:1})+' '+u;const devices=this.$('deviceDetails');if(devices)devices.innerHTML=(attrs.devices||[]).map(d=>`<div class="detail-tile"><strong>${esc(d.name)}</strong><p>🌡 Temperatur: ${fmt(d.temp,'°C')}</p><p>🔋 Ladestand: ${fmt(d.soc,'%')}</p><p>⚡ Lade-/Entladeleistung: ${fmt(d.power,'W')}</p></div>`).join('')||'<p>Gerätewerte bitte in den Integrationsoptionen zuordnen.</p>';const mppts=this.$('mpptDetails');if(mppts)mppts.innerHTML=(attrs.mppts||[]).map(d=>`<div class="detail-tile"><strong>System ${esc(d.system)} · MPPT ${esc(d.index)}</strong><p>${fmt(d.power,'W')}</p></div>`).join('');const plugs=this.$('plugDetails');if(plugs)plugs.innerHTML=(attrs.plugs||[]).map(d=>`<div class="detail-tile"><strong>${esc(d.name)}</strong><p>${fmt(d.power,'W')}</p></div>`).join('');};
 Panel.prototype.renderEntityCatalog=function(){const root=this.shadowRoot;if(!root||!this._hass)return;const search=(root.getElementById('solix-search')?.value||'').toLocaleLowerCase();const only=root.getElementById('solix-only')?.checked;const states=Object.values(this._hass.states||{});const relevant=s=>/anker|solix|solarbank|e1600|system_sb_/i.test([s.entity_id,s.attributes?.friendly_name,s.attributes?.device_class].join(' '));const found=states.filter(s=>(!only||relevant(s))&&(!search||[s.entity_id,s.attributes?.friendly_name,s.state,s.attributes?.unit_of_measurement].join(' ').toLocaleLowerCase().includes(search))).sort((a,b)=>a.entity_id.localeCompare(b.entity_id));root.getElementById('solix-result-count').textContent=`${found.length} von ${states.length} verfügbaren Entitäten · keine Duplikate angelegt`;const esc=v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));root.getElementById('solix-rows').innerHTML=found.map(s=>`<tr><td><strong>${esc(s.attributes?.friendly_name||s.entity_id)}</strong><div class="muted">${esc(s.entity_id)}</div></td><td>${esc(s.state)}</td><td>${esc(s.attributes?.unit_of_measurement||'')}</td></tr>`).join('')||'<tr><td colspan="3">Keine passenden Entitäten gefunden.</td></tr>';root.getElementById('solix-count').textContent=`${states.length} HA-Entitäten`;};
