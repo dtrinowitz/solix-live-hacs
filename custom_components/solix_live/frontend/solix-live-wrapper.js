@@ -2,7 +2,40 @@ import '/solix_live/solix-live-panel.js';
 const Panel=customElements.get('solix-live-panel');
 const originalConnected=Panel.prototype.connectedCallback;
 const originalRefresh=Panel.prototype.refresh;
-Panel.prototype.connectedCallback=function(){originalConnected.call(this);if(this.shadowRoot.getElementById('solix-tools'))return;
+// Resolve a dashboard metric to the actual Home Assistant entity before opening more-info.
+// Home Assistant may assign an entity_id different from the integration's suggested name.
+const METRIC_NAMES={solarleistung:'Solarleistung',ausgangsleistung:'Ausgangsleistung',hausverbrauch:'Hausverbrauch',hauseinspeisung:'Hauseinspeisung',ladestand:'Ladestand',betriebszustand:'Betriebszustand',systemdetails:'Systemdetails'};
+Panel.prototype._metricEntity=function(key){
+  const states=this._hass?.states||{};
+  const preferred='sensor.solix_live_'+key;
+  if(states[preferred]&&!['unknown','unavailable'].includes(String(states[preferred].state).toLowerCase()))return states[preferred];
+  const expected=METRIC_NAMES[key];
+  if(!expected)return null;
+  const matches=Object.values(states).filter(s=>{
+    if(!s.entity_id?.startsWith('sensor.'))return false;
+    const label=String(s.attributes?.friendly_name||'');
+    return (s.entity_id.startsWith('sensor.solix_live_')||/SOLIX Live/i.test(label)) &&
+      (label===expected||label==='SOLIX Live '+expected||label.endsWith(' '+expected)) &&
+      !s.attributes?.read_only_mirror;
+  });
+  return matches.length===1?matches[0]:null;
+};
+Panel.prototype._installMetricDetailRouting=function(){
+  if(this._metricDetailRoutingInstalled)return;
+  this._metricDetailRoutingInstalled=true;
+  this.addEventListener('hass-more-info',event=>{
+    const id=event.detail?.entityId;
+    const match=/^sensor\\.solix_live_(solarleistung|ausgangsleistung|hausverbrauch|hauseinspeisung|ladestand|betriebszustand|systemdetails)$/.exec(id||'');
+    if(!match)return;
+    const target=this._metricEntity(match[1]);
+    if(!target||target.entity_id===id)return;
+    event.stopImmediatePropagation();
+    event.stopPropagation();
+    this.dispatchEvent(new CustomEvent('hass-more-info',{detail:{entityId:target.entity_id},bubbles:true,composed:true}));
+  },true);
+};
+
+Panel.prototype.connectedCallback=function(){originalConnected.call(this);this._installMetricDetailRouting();if(this.shadowRoot.getElementById('solix-tools'))return;
 const css=document.createElement('style');css.textContent=`.solix-tools{display:flex;flex-wrap:wrap;align-items:center;gap:9px;padding:12px;background:#112b3d;border-radius:12px;margin-bottom:12px}.solix-tools button,.solix-tools input{padding:9px;border:1px solid #60889b;border-radius:8px;background:#16374b;color:#fff}.solix-tools input{min-width:170px;flex:1}.solix-entities{max-height:60vh;overflow:auto}.solix-entities table{width:100%;border-collapse:collapse;font-size:13px}.solix-entities td,.solix-entities th{padding:7px;border-bottom:1px solid #31506a;text-align:left;overflow-wrap:anywhere}.solix-entities th{position:sticky;top:0;background:#112b3d}.solix-entities .muted{color:#aac3d0}`;this.shadowRoot.append(css);
 const bar=document.createElement('div');bar.id='solix-tools';bar.className='solix-tools';bar.innerHTML='<button type="button" id="solix-menu" aria-label="Home Assistant Menü öffnen">☰ Menü</button><a href="/lovelace" style="color:#fff;padding:9px">Übersicht</a><a href="/config" style="color:#fff;padding:9px">Einstellungen</a><button type="button" id="solix-entities-toggle">Alle Entitäten anzeigen</button><span id="solix-count"></span>';this.shadowRoot.querySelector('.wrap').prepend(bar);
 bar.querySelector('#solix-menu').addEventListener('click',()=>{this.dispatchEvent(new Event('hass-toggle-menu',{bubbles:true,composed:true}));});
