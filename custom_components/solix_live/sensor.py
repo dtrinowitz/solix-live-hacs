@@ -5,6 +5,7 @@ import math
 from homeassistant.helpers.event import async_track_state_change_event
 from homeassistant.helpers.entity import DeviceInfo
 from .const import DOMAIN
+from .mirror import SolixMirrorManager, discover_sources
 
 LABELS = {
     "solarleistung": "Solarleistung", "ausgangsleistung": "Ausgangsleistung", "hausverbrauch": "Hausverbrauch",
@@ -14,6 +15,13 @@ LABELS = {
 
 async def async_setup_entry(hass, entry, async_add_entities):
     async_add_entities([SolixValue(hass, entry, key) for key in LABELS])
+    manager = SolixMirrorManager(hass, async_add_entities)
+    manager.refresh()
+    # Registry changes can add newly discovered devices and entities at runtime.
+    from homeassistant.helpers.entity_registry import EVENT_ENTITY_REGISTRY_UPDATED
+    entry.async_on_unload(hass.bus.async_listen(EVENT_ENTITY_REGISTRY_UPDATED, manager.refresh))
+    from homeassistant.helpers.device_registry import EVENT_DEVICE_REGISTRY_UPDATED
+    entry.async_on_unload(hass.bus.async_listen(EVENT_DEVICE_REGISTRY_UPDATED, manager.refresh))
 
 class SolixValue(SensorEntity):
     _attr_has_entity_name = True
@@ -35,12 +43,27 @@ class SolixValue(SensorEntity):
     async def async_added_to_hass(self):
         await super().async_added_to_hass()
         self.async_on_remove(async_track_state_change_event(self.hass, list(self._ids()), self._update)) if self._ids() else None
+        if self.key == "systemdetails":
+            self._source_ids = set(discover_sources(self.hass))
+            self.async_on_remove(self.hass.bus.async_listen("state_changed", self._detail_changed))
+            self.async_on_remove(self.hass.bus.async_listen("entity_registry_updated", self._detail_registry_changed))
+
 
     def _config(self):
         return {**self.entry.data, **self.entry.options}
 
     def _ids(self):
         d=self._config(); return {x for k,v in d.items() for x in (v if isinstance(v,list) else [v]) if isinstance(x,str) and x}
+
+    @callback
+    def _detail_changed(self, event):
+        if event.data.get("entity_id") in self._source_ids:
+            self.async_write_ha_state()
+
+    @callback
+    def _detail_registry_changed(self, event):
+        self._source_ids = set(discover_sources(self.hass))
+        self.async_write_ha_state()
 
     @callback
     def _update(self, event):
@@ -113,62 +136,92 @@ class SolixValue(SensorEntity):
         }
 
     def _system_details(self):
+        """Discover live device values using actual HA device associations.
+
+        Never assign a reading to an arbitrary system number. Manual selections
+        take precedence, while automatic readings are grouped by original device.
+        """
         config = self._config()
+        sources = discover_sources(self.hass)
+        grouped = {}
+        for entity_id, (record, device) in sources.items():
+            device_key = device.id if device else "unassigned"
+            label = ((getattr(device, "name_by_user", None) or getattr(device, "name", None))
+                     if device else "Weitere Anker-SOLIX-Entitäten")
+            grouped.setdefault(device_key, {"name": label, "readings": []})["readings"].append(
+                (entity_id, (record.name or record.original_name or entity_id).lower()))
+
+        def reading(entity_id):
+            state = self.hass.states.get(entity_id) if entity_id else None
+            if not state or state.state.lower() in ("unknown", "unavailable", "none", ""):
+                return None
+            try:
+                value = float(state.state)
+                if not math.isfinite(value):
+                    return None
+                if state.attributes.get("unit_of_measurement") == "kW":
+                    value *= 1000
+                return value
+            except (TypeError, ValueError):
+                return None
+
+        def select_metric(items, metric):
+            terms = {
+                "temp": ("temperatur", "temperature", "battery_temp", "bat_temp"),
+                "soc": ("ladestand", "battery_soc", "state_of_charge", "akku_soc", "battery_level", "capacity"),
+                "power": ("ladeleistung", "entladeleistung", "battery_power", "bat_power", "charging_power", "discharging_power"),
+            }[metric]
+            candidates = []
+            for entity_id, label in items:
+                name = entity_id.split(".", 1)[-1].lower() + " " + label
+                if any(term in name for term in terms):
+                    state = self.hass.states.get(entity_id)
+                    unit = state.attributes.get("unit_of_measurement") if state else None
+                    expected = {"temp": ("°C", "°F"), "soc": ("%",), "power": ("W", "kW")}[metric]
+                    if unit in expected:
+                        candidates.append(entity_id)
+            # Ambiguous matches must not be silently attributed to a device.
+            return reading(candidates[0]) if len(candidates) == 1 else None
+
         devices = []
-        for key, label, heated in (
-            ("pro_1", "Solarbank 2 Pro · System 1", True),
-            ("pro_2", "Solarbank 2 Pro · System 2", True),
-            ("e1600_1", "Solarbank E1600 · Akku 1", False),
-            ("e1600_2", "Solarbank E1600 · Akku 2", False),
-        ):
-            readings = {}
-            for metric in ("temp", "soc", "power"):
-                entity_id = config.get(f"{key}_{metric}")
-                state = self.hass.states.get(entity_id) if entity_id else None
-                value = None
-                if state and state.state.lower() not in ("unknown", "unavailable", "none", ""):
-                    try:
-                        value = float(state.state)
-                        if not math.isfinite(value):
-                            value = None
-                    except (TypeError, ValueError):
-                        pass
-                readings[metric] = value
-            devices.append({"name": label, "heated": heated, **readings})
+        for group in grouped.values():
+            items = group["readings"]
+            devices.append({"name": group["name"], "heated": True,
+                            "temp": select_metric(items, "temp"),
+                            "soc": select_metric(items, "soc"),
+                            "power": select_metric(items, "power"),
+                            "source_count": len(items)})
+
+        # Preserve manual per-device readings when present, but do not label
+        # an unknown device as a specific Solarbank based on ordering.
+        manually_configured = []
+        for key in ("pro_1", "pro_2", "e1600_1", "e1600_2"):
+            if any(config.get(f"{key}_{metric}") for metric in ("temp", "soc", "power")):
+                manually_configured.append({
+                    "name": "Manuell zugeordnet · " + key,
+                    "temp": reading(config.get(f"{key}_temp")),
+                    "soc": reading(config.get(f"{key}_soc")),
+                    "power": reading(config.get(f"{key}_power")),
+                })
+        devices.extend(manually_configured)
+
         mppts = []
         for system in (1, 2):
             for index in range(1, 5):
                 entity_id = config.get(f"pro_{system}_mppt_{index}")
-                state = self.hass.states.get(entity_id) if entity_id else None
-                value = None
-                if state and state.state.lower() not in ("unknown", "unavailable", "none", ""):
-                    try:
-                        value = float(state.state)
-                        if state.attributes.get("unit_of_measurement") == "kW":
-                            value *= 1000
-                        if not math.isfinite(value):
-                            value = None
-                    except (TypeError, ValueError):
-                        pass
-                mppts.append({"system": system, "index": index, "power": value})
+                if entity_id:
+                    mppts.append({"system": system, "index": index,
+                                  "power": reading(entity_id)})
         plugs = config.get("plugs", []) or []
         if isinstance(plugs, str):
             plugs = [plugs]
         plug_values = []
         for entity_id in plugs:
             state = self.hass.states.get(entity_id)
-            value = None
-            if state and state.state.lower() not in ("unknown", "unavailable", "none", ""):
-                try:
-                    value = float(state.state)
-                    if state.attributes.get("unit_of_measurement") == "kW":
-                        value *= 1000
-                    if not math.isfinite(value):
-                        value = None
-                except (TypeError, ValueError):
-                    pass
-            plug_values.append({"name": state.attributes.get("friendly_name", entity_id) if state else entity_id, "power": value})
-        return {"devices": devices, "mppts": mppts, "plugs": plug_values}
+            plug_values.append({"name": state.attributes.get("friendly_name", entity_id)
+                                if state else entity_id, "power": reading(entity_id)})
+        return {"devices": devices, "mppts": mppts, "plugs": plug_values,
+                "discovered_source_entities": len(sources)}
 
     @property
     def native_value(self):
@@ -196,4 +249,3 @@ class SolixValue(SensorEntity):
                     state=self.hass.states.get(entity_id)
                     if state and state.state not in ("unknown","unavailable"):vals.append(state.state)
             return " / ".join(vals) if vals else None
-
