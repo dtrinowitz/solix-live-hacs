@@ -15,7 +15,7 @@ def schema(defaults=None):
     for key in FIELDS:
         label = {"pv_1":"PV-System 1", "pv_2":"PV-System 2", "output_1":"Hausabgabe System 1", "output_2":"Hausabgabe System 2", "soc_1":"Ladestand 1", "soc_2":"Ladestand 2", "status_1":"Betriebszustand 1", "status_2":"Betriebszustand 2", "plugs":"Smart-Plugs"}.get(key, key)
         if key not in BASE_FIELDS:
-            label = key.replace("_", " ").upper()
+            label = key.replace("_", " ").replace("pro 1", "Solarbank 2 Pro 1").replace("pro 2", "Solarbank 2 Pro 2").replace("e1600 1", "Solarbank E1600 an PV 1").replace("e1600 2", "Solarbank E1600 an PV 2").replace("temp", "Temperatur").replace("soc", "Ladestand").replace("power", "Lade-/Entladeleistung").replace("mppt", "MPPT")
         sel = selector.EntitySelector(selector.EntitySelectorConfig(domain="sensor", multiple=(key=="plugs")))
         result[vol.Optional(key, default=defaults[key]) if key in defaults else vol.Optional(key)] = sel
     return vol.Schema(result)
