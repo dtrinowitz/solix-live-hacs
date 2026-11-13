@@ -1,7 +1,7 @@
 {
   "domain": "solix_live",
   "name": "SOLIX Live Energiedashboard",
-  "version": "1.1.2",
+  "version": "1.1.3",
   "documentation": "https://github.com/dtrinowitz/solix-live-hacs",
   "issue_tracker": "https://github.com/dtrinowitz/solix-live-hacs/issues",
   "config_flow": true,
