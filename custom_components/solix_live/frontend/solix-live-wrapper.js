@@ -23,9 +23,11 @@ Panel.prototype._metricEntity=function(key){
 Panel.prototype.openDetails=function(kind){
   const key={pv:'solarleistung',battery:'ladestand',home:'hausverbrauch',export:'hauseinspeisung'}[kind];
   const target=key&&this._metricEntity(key);
-  if(!target)return;
-  this.dispatchEvent(new CustomEvent('hass-more-info',{bubbles:true,composed:true,detail:{entityId:target.entity_id}}));
+  if(!target){this._openSolixDetail(kind);return;}
+  this._openSolixDetail(kind);
+  /*this.dispatchEvent(new CustomEvent('hass-more-info',{bubbles:true,composed:true,detail:{entityId:target.entity_id}}));*/
 };
+Panel.prototype._openSolixDetail=function(kind){const section=this.shadowRoot.querySelector('.details');if(!section)return;section.scrollIntoView({behavior:'smooth',block:'start'});section.querySelectorAll('details').forEach(el=>{el.open=(kind==='pv');});};
 Panel.prototype._translateStatus=function(value){
  const labels={discharge:'Entladen',charge:'Laden',charging:'Laden',discharging:'Entladen',detection:'Erkennung',standby:'Bereitschaft',full_bypass:'Direktversorgung',bypass:'Direktversorgung',idle:'Leerlauf'};
  return String(value||'Unbekannt').split(/(\\s*\\/\\s*)/).map(part=>labels[part.trim().toLowerCase()]||part).join('');
@@ -72,7 +74,7 @@ Panel.prototype._installMetricDetailRouting=function(){
 Panel.prototype.connectedCallback=function(){originalConnected.call(this);this._installMetricDetailRouting();if(this.shadowRoot.getElementById('solix-tools'))return;
 const css=document.createElement('style');css.textContent=`.solix-tools{display:flex;flex-wrap:wrap;align-items:center;gap:9px;padding:12px;background:#112b3d;border-radius:12px;margin-bottom:12px}.solix-tools button,.solix-tools input{padding:9px;border:1px solid #60889b;border-radius:8px;background:#16374b;color:#fff}.solix-tools input{min-width:170px;flex:1}.solix-entities{max-height:60vh;overflow:auto}.solix-entities table{width:100%;border-collapse:collapse;font-size:13px}.solix-entities td,.solix-entities th{padding:7px;border-bottom:1px solid #31506a;text-align:left;overflow-wrap:anywhere}.solix-entities th{position:sticky;top:0;background:#112b3d}.solix-entities .muted{color:#aac3d0}`;this.shadowRoot.append(css);
 const bar=document.createElement('div');bar.id='solix-tools';bar.className='solix-tools';bar.innerHTML='<button type="button" id="solix-menu" aria-label="Home Assistant Menü öffnen">☰ Menü</button><a href="/lovelace" style="color:#fff;padding:9px">Übersicht</a><a href="/config" style="color:#fff;padding:9px">Einstellungen</a><button type="button" id="solix-entities-toggle">Alle Entitäten anzeigen</button><span id="solix-count"></span>';this.shadowRoot.querySelector('.wrap').prepend(bar);
-bar.querySelector('#solix-menu').addEventListener('click',()=>{this.dispatchEvent(new Event('hass-toggle-menu',{bubbles:true,composed:true}));});
+bar.querySelector('#solix-menu').addEventListener('click',()=>{const root=document.querySelector('home-assistant');if(root){root.dispatchEvent(new Event('hass-toggle-menu',{bubbles:true,composed:true}));}else{this.dispatchEvent(new Event('hass-toggle-menu',{bubbles:true,composed:true}));}});
 const section=document.createElement('section');section.id='solix-entity-section';section.className='details';section.hidden=true;section.innerHTML='<h2>Home Assistant · Entitätenübersicht</h2><p>Alle aktuell geladenen Home-Assistant-Entitäten. Suche nach SOLIX, Anker, Gerätenamen oder Entity-ID.</p><div class="solix-tools"><input id="solix-search" aria-label="Entitäten suchen" placeholder="Entitäten suchen …"><label><input type="checkbox" id="solix-only" checked> Nur Anker / SOLIX</label></div><p id="solix-result-count"></p><div class="solix-entities"><table><thead><tr><th>Entität</th><th>Zustand</th><th>Einheit</th></tr></thead><tbody id="solix-rows"></tbody></table></div>';this.shadowRoot.querySelector('.wrap').append(section);
 bar.querySelector('#solix-entities-toggle').addEventListener('click',()=>{section.hidden=!section.hidden;bar.querySelector('#solix-entities-toggle').textContent=section.hidden?'Alle Entitäten anzeigen':'Entitäten ausblenden';if(!section.hidden)this.renderEntityCatalog();});
 section.querySelector('#solix-search').addEventListener('input',()=>this.renderEntityCatalog());section.querySelector('#solix-only').addEventListener('change',()=>this.renderEntityCatalog());this.refresh();};
