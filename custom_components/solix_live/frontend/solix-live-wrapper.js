@@ -30,7 +30,7 @@ Panel.prototype.openDetails=function(kind){
 Panel.prototype._openSolixDetail=function(kind){const section=this.shadowRoot.querySelector('.details');if(!section)return;section.scrollIntoView({behavior:'smooth',block:'start'});section.querySelectorAll('details').forEach(el=>{el.open=(kind==='pv');});};
 Panel.prototype._translateStatus=function(value){
  const labels={discharge:'Entladen',charge:'Laden',charging:'Laden',discharging:'Entladen',detection:'Erkennung',standby:'Bereitschaft',full_bypass:'Direktversorgung',bypass:'Direktversorgung',idle:'Leerlauf'};
- return String(value||'Unbekannt').split(/(\\s*\\/\\s*)/).map(part=>labels[part.trim().toLowerCase()]||part).join('');
+ return String(value||'Unbekannt').split('/').map(part=>labels[part.trim().toLowerCase()]||part).join(' / ');
 };
 Panel.prototype._updateVisualLabels=function(){
  const view=this.$('view');if(!view)return;
