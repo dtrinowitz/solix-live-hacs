@@ -36,9 +36,7 @@ def discover_sources(hass):
             getattr(device, "name_by_user", None), getattr(device, "name", None),
             getattr(device, "manufacturer", None), getattr(device, "model", None),
         )) if device else ""
-        is_solix = (entity.platform in SOURCE_DOMAINS
-                    or bool(NAME_PATTERN.search(device_label))
-                    or bool(NAME_PATTERN.search(entity.entity_id + " " + (entity.original_name or ""))))
+        # Names alone are not provenance: FRITZ!Box trackers and unrelated\n        # smart-home devices can be named "Anker" without being SOLIX data.\n        # Only mirror entities owned by an actual Anker SOLIX integration.\n        integration_domain = None\n        if entity.config_entry_id:\n            owner = hass.config_entries.async_get_entry(entity.config_entry_id)\n            integration_domain = owner.domain if owner else None\n        is_solix = (entity.platform in SOURCE_DOMAINS\n                    or integration_domain in SOURCE_DOMAINS)
         if not is_solix:
             continue
         # Do not copy our own mirror or aggregate entities even if their name matches.
